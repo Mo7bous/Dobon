@@ -1,0 +1,2317 @@
+<html>
+<head>
+  <title>Card Game</title>
+  <style>
+    :root {
+      --card-width: 80px;
+      --card-height: 120px;
+      --uno-red: #e53935;
+      --uno-yellow: #fbc02d;
+      --uno-blue: #2575fc;
+      --uno-green: #43a047;
+    }
+    
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      margin: 0;
+      background: #1c1c1c;
+      min-height: 100vh;
+      color: white;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    #game-container {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      box-sizing: border-box;
+    }
+
+    #start-screen {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .button {
+      padding: 15px 30px;
+      font-size: 18px;
+      font-weight: bold;
+      background: var(--uno-red); /* UNO Red */
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 10px;
+      transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    #start-screen .button {
+        width: 80%;
+        max-width: 300px;
+    }
+
+    .button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    
+    .button:disabled {
+        background: #999;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .card {
+      width: var(--card-width);
+      height: var(--card-height);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 32px;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.3s ease-out, box-shadow 0.3s;
+      margin: 0 -35px; /* Overlap cards more in hand */
+      background: white;
+      color: black;
+      text-shadow: none;
+      border: 1px solid #ccc;
+      padding: 5px;
+      box-sizing: border-box;
+    }
+
+    .card.spades, .card.clubs { color: black; }
+    .card.hearts, .card.diamonds { color: #d32f2f; }
+    .card.wild { background: linear-gradient(135deg, #6a11cb, #2575fc); color: white; }
+    
+    .card.playable {
+      box-shadow: 0 0 20px 5px #4dd0e1; /* Cyan glow */
+    }
+
+    .card.selected {
+        transform: translateY(-20px) scale(1.1) !important;
+        box-shadow: 0 0 25px 8px #fdd835; /* Yellow glow for selected */
+        border: 3px solid #fdd835;
+    }
+
+    #player-hand .card:hover {
+      transform: translateY(-20px) scale(1.1);
+      z-index: 100;
+    }
+    
+    .card .value {
+      font-size: 1.2em;
+    }
+    
+    .card .corner {
+        position: absolute;
+        font-size: 18px;
+        font-weight: bold;
+        line-height: 1;
+        font-family: 'Times New Roman', Times, serif;
+    }
+
+    .card .top-left {
+        top: 8px;
+        left: 10px;
+        text-align: center;
+    }
+
+    .card .bottom-right {
+        bottom: 8px;
+        right: 10px;
+        transform: rotate(180deg);
+        text-align: center;
+    }
+
+    .game-logo {
+      width: 200px;
+      height: auto;
+      margin-bottom: 20px;
+    }
+
+    #player-hand {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      padding: 10px 0;
+      width: 100%;
+      height: calc(var(--card-height) + 20px);
+      perspective: 1000px;
+      transition: transform 0.5s ease-out;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    #player-hand .card {
+      transform: translateY(20px) rotateX(10deg);
+    }
+
+    #game-area {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 30px;
+      margin: 15px 0;
+    }
+
+    #discard-pile {
+      position: relative;
+      width: var(--card-width);
+      height: var(--card-height);
+    }
+    
+    #discard-pile .card {
+      position: absolute;
+      top: 0;
+      left: 0;
+      margin: 0;
+      transition: transform 0.5s ease-out;
+    }
+
+    #draw-pile {
+      background: #000;
+      color: white;
+      text-align: center;
+      border: 3px solid #333;
+    }
+    
+    #draw-pile .game-logo {
+      width: 70%;
+      height: auto;
+      margin: 0;
+    }
+
+    #current-color-indicator {
+      display: none; /* Replaced by info-zone text */
+    }
+    
+    #info-zone {
+      padding: 10px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 50;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      margin: 10px 0;
+    }
+    
+    #info-zone .current-player-name.my-turn {
+        font-weight: bold;
+        color: #4dd0e1;
+    }
+
+    #info-zone > div {
+        margin-bottom: 5px;
+    }
+
+    #move-history {
+        font-size: 14px;
+        color: #ccc;
+        font-style: italic;
+        max-height: 60px;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+    #move-history p {
+        margin: 0 0 4px 0;
+    }
+
+    .disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    #color-picker {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      padding: 30px;
+      border-radius: 20px;
+      z-index: 1000;
+      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    #color-picker button {
+      width: 70px;
+      height: 70px;
+      border: 4px solid white;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-size: 40px;
+      background: #333;
+    }
+
+    #color-picker button:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 20px 2px currentColor;
+    }
+    
+    #ai-setup-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 3000;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #ai-setup-modal .setup-content {
+        background: rgba(0,0,0,0.5);
+        padding: 30px 40px;
+        border-radius: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 25px;
+        width: 90%;
+        max-width: 400px;
+    }
+    
+    #ai-setup-modal h2 {
+        margin-top: 0;
+        font-size: 2em;
+    }
+
+    #ai-setup-modal .setup-option {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 1.2em;
+    }
+    
+    #ai-setup-modal select {
+        padding: 8px 12px;
+        border-radius: 5px;
+        background: #333;
+        color: white;
+        border: 1px solid #555;
+        font-size: 1em;
+    }
+    
+    #ai-setup-modal .setup-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 15px;
+    }
+
+    #mode-select {
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .player-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      padding: 8px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 8px;
+      transition: background-color 0.3s, transform 0.3s;
+      width: 100px;
+      text-align: center;
+      font-size: 12px;
+    }
+    
+    .player-info.current-turn {
+        background-color: rgba(77, 208, 225, 0.3);
+        transform: scale(1.05);
+    }
+
+    .player-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid white;
+    }
+
+    #players-list-top {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px;
+      width: 100%;
+      z-index: 40;
+    }
+
+    .player-details {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .player-score {
+        font-size: 14px;
+        font-weight: bold;
+        color: #fdd835;
+    }
+    
+    .card-count {
+      background: rgba(0,0,0,0.5);
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    #waiting-message {
+      text-align: center;
+      font-size: 18px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 20px;
+    }
+    
+    #game-setup-options {
+        background: rgba(0,0,0,0.2);
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 15px;
+    }
+
+    #game-setup-options label {
+        margin-right: 10px;
+    }
+    
+    #game-setup-options select {
+        padding: 5px;
+        border-radius: 5px;
+        background: #333;
+        color: white;
+        border: 1px solid #555;
+    }
+
+    #ready-status {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+      min-width: 300px;
+      background: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 10px;
+    }
+
+    .ready-player {
+      padding: 10px 15px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background-color 0.3s;
+    }
+
+    .ready-player.is-ready {
+      background: rgba(85,255,85,0.2);
+    }
+    
+    .ready-player.is-host::after {
+      content: '👑';
+      margin-left: 10px;
+      font-size: 20px;
+    }
+
+    #server-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    
+    #winner-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 2000;
+      text-align: center;
+    }
+    #winner-overlay h2 {
+      font-size: 3em;
+      margin-bottom: 20px;
+      text-shadow: 0 0 20px #fff;
+    }
+
+    #scoreboard {
+        width: 80%;
+        max-width: 500px;
+        background: rgba(255,255,255,0.1);
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    
+    #scoreboard h3 {
+        margin-top: 0;
+    }
+    
+    .score-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .score-row .player-name {
+        font-weight: bold;
+    }
+    
+    .score-row .player-score-value {
+        font-weight: bold;
+        color: #fdd835;
+    }
+    
+    .end-of-round-hand {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed rgba(255,255,255,0.3);
+    }
+    
+    .end-of-round-hand .hand-cards {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 5px;
+        margin-top: 5px;
+    }
+    
+    .end-of-round-hand .card {
+        width: 40px;
+        height: 60px;
+        font-size: 16px;
+        margin: 0;
+        cursor: default;
+        position: relative;
+    }
+    
+    .end-of-round-hand .card .corner {
+        font-size: 10px;
+    }
+    
+    .end-of-round-hand .card .value {
+        font-size: 0.8em;
+    }
+
+    .score-row:last-child {
+        border-bottom: none;
+    }
+
+    #dobon-button {
+      background: var(--uno-yellow);
+      color: black;
+      cursor: pointer;
+    }
+
+    #main-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        width: 100%;
+        margin: 15px 0;
+    }
+
+    #play-selected-button {
+        padding: 20px 40px;
+        font-size: 22px;
+        background: var(--uno-red);
+        flex-grow: 1;
+        max-width: 250px;
+    }
+    
+    #side-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    #side-controls .button {
+        margin: 0;
+        padding: 10px 15px;
+        font-size: 14px;
+        min-width: 120px;
+    }
+
+    #scoreboard-button {
+        background: var(--uno-blue);
+    }
+
+    #hand-value-button {
+        background: var(--uno-green);
+        cursor: default;
+    }
+    
+    #exit-button {
+      position: fixed;
+      top: 15px;
+      left: 15px;
+      width: 40px;
+      height: 40px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 50%;
+      border: 2px solid white;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      z-index: 2100;
+      line-height: 1;
+    }
+
+    #confirm-exit-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 3000;
+      text-align: center;
+    }
+    #confirm-exit-modal h3 {
+        font-size: 2em;
+        margin-bottom: 30px;
+    }
+
+    #game-notification {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      padding: 20px 40px;
+      border-radius: 15px;
+      font-size: 2.5em;
+      font-weight: bold;
+      z-index: 5000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+      text-align: center;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+
+    #game-notification.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.1);
+    }
+
+
+    /* Smartphone Adaptability */
+    @media (max-width: 768px) {
+        :root {
+            --card-width: 65px;
+            --card-height: 95px;
+        }
+
+        #players-list-top {
+            gap: 5px;
+            padding: 5px;
+        }
+
+        .player-info {
+            width: 85px;
+            padding: 5px;
+            gap: 3px;
+        }
+        
+        .player-avatar {
+            width: 30px;
+            height: 30px;
+        }
+        
+        #exit-button {
+            top: 10px;
+            left: 10px;
+            width: 35px;
+            height: 35px;
+        }
+    }
+  </style>
+</head>
+<body>
+  <div id="start-screen">
+    <img src="/fd.png" alt="UNO" class="game-logo">
+    <div id="mode-select">
+      <button class="button" onclick="createServer()">Create Multiplayer Game</button>
+      <button class="button" onclick="showAiSetup()">Play vs AI</button>
+    </div>
+  </div>
+
+  <div id="waiting-message">
+    <h2>Game Lobby</h2>
+    <p>Waiting for players to join and get ready...</p>
+    <div id="game-setup-options">
+        <label for="rounds-select">Rounds to Win:</label>
+        <select id="rounds-select" onchange="updateGameSettings()">
+            <option value="3">3 Rounds</option>
+            <option value="5" selected>5 Rounds</option>
+            <option value="10">10 Rounds</option>
+        </select>
+    </div>
+    <div id="ready-status"></div>
+    <div id="server-controls" style="margin-top: 20px;">
+      <button class="button" id="ready-button" onclick="toggleReady()">Ready</button>
+      <button class="button" id="start-button" style="display: none;" onclick="startMultiplayerGame()" disabled>Start Game</button>
+    </div>
+     <button class="button" style="background: #aa2222;" onclick="leaveLobby()">Leave Lobby</button>
+  </div>
+
+  <div id="game-container">
+    <div id="exit-button" onclick="confirmExit()">×</div>
+    
+    <div id="players-list-top"></div>
+
+    <div id="game-area">
+      <div id="draw-pile" class="card" onclick="drawCard()">
+         <img src="/draw-icon.png" alt="Draw Card" class="game-logo">
+      </div>
+      <div id="discard-pile"></div>
+    </div>
+
+    <div id="info-zone">
+      <div>Round <span id="round-number">1</span> of <span id="total-rounds">5</span></div>
+      <div id="current-color-text">Current Suit: ...</div>
+      <div>Current Turn: <span id="current-player-name" class="current-player-name"></span></div>
+      <div>Last Moves:</div>
+      <div id="move-history"></div>
+    </div>
+    
+    <div id="main-controls">
+        <button class="button" id="play-selected-button" style="display: none;" onclick="playSelectedCards()">Play Selected</button>
+        <div id="side-controls">
+            <button class="button" id="dobon-button" onclick="callDobon()">DOBON!</button>
+            <button class="button" id="scoreboard-button" onclick="showScoreboard()">Scoreboard</button>
+            <button class="button" id="hand-value-button">Value: 0</button>
+        </div>
+    </div>
+
+    <div id="player-hand"></div>
+
+    <div id="color-picker">
+      <button style="color: #d32f2f;" onclick="selectSuit('hearts')">♥</button>
+      <button style="color: black;" onclick="selectSuit('clubs')">♣</button>
+      <button style="color: #d32f2f;" onclick="selectSuit('diamonds')">♦</button>
+      <button style="color: black;" onclick="selectSuit('spades')">♠</button>
+    </div>
+    
+    <div id="game-notification"></div>
+
+    <div id="winner-overlay">
+        <h2 id="winner-name"></h2>
+        <div id="scoreboard">
+            <h3>Scores</h3>
+            <div id="score-details"></div>
+        </div>
+        <button class="button" id="next-round-button" onclick="startNextRound()">Next Round</button>
+        <button class="button" id="back-to-menu-button" onclick="leaveLobby()">Back to Menu</button>
+    </div>
+  </div>
+
+   <div id="ai-setup-modal">
+    <div class="setup-content">
+      <h2>AI Game Setup</h2>
+      <div class="setup-option">
+        <label for="ai-players-select">Number of Bots:</label>
+        <select id="ai-players-select">
+          <option value="1" selected>1 Bot</option>
+          <option value="2">2 Bots</option>
+          <option value="3">3 Bots</option>
+          <option value="4">4 Bots</option>
+          <option value="5">5 Bots</option>
+          <option value="6">6 Bots</option>
+          <option value="7">7 Bots</option>
+          <option value="8">8 Bots</option>
+        </select>
+      </div>
+      <div class="setup-option">
+        <label for="ai-rounds-select">Rounds to Win:</label>
+        <select id="ai-rounds-select">
+            <option value="3">3 Rounds</option>
+            <option value="5" selected>5 Rounds</option>
+            <option value="10">10 Rounds</option>
+        </select>
+      </div>
+      <div class="setup-buttons">
+        <button class="button" onclick="startAiGame()">Start Game</button>
+        <button class="button" style="background: #777;" onclick="hideAiSetup()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+   <div id="confirm-exit-modal">
+        <h3>Are you sure you want to quit?</h3>
+        <div>
+            <button class="button" style="background: #aa2222;" onclick="leaveLobby()">Yes, Quit</button>
+            <button class="button" onclick="document.getElementById('confirm-exit-modal').style.display = 'none'">No, Cancel</button>
+        </div>
+    </div>
+
+  <script>
+    let room;
+    let isSoloMode = false;
+    let botPlayers = [];
+    let tempWildCard = null;
+    let soloGame = {};
+    let selectedCardsIndices = [];
+    let notificationTimeout;
+
+
+    const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
+    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const suitSymbols = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
+
+    function getCardValue(cardContent) {
+        if (!cardContent) return 0;
+        if (cardContent === 'A') return 1;
+        if (cardContent === 'J') return 11;
+        if (cardContent === 'Q') return 12;
+        if (cardContent === 'K') return 13;
+        if (cardContent === '8') return 50; // Wilds are worth 50
+        const value = parseInt(cardContent, 10);
+        return isNaN(value) ? 10 : value; // Treat other special cards as 10 for value
+    }
+
+    function createCardElement({ content, color, index }) { // color is now suit
+      const cardEl = document.createElement('div');
+      const isWild = content === '8';
+      cardEl.className = `card ${isWild ? 'wild' : color}`;
+      cardEl.dataset.content = content;
+      cardEl.dataset.color = color; // Keep data-color for suit
+      if (index !== undefined) {
+          cardEl.dataset.index = index; // Add index for selection
+      }
+      
+      const suitSymbol = suitSymbols[color] || '★';
+
+      cardEl.innerHTML = `
+        <div class="corner top-left">${content}<br>${suitSymbol}</div>
+        <div class="value">${isWild ? 'Wild' : suitSymbol}</div>
+        <div class="corner bottom-right">${content}<br>${suitSymbol}</div>
+      `;
+      return cardEl;
+    }
+    
+    function initializeDeck() {
+        const deck = [];
+        suits.forEach(suit => {
+            ranks.forEach(rank => {
+                deck.push({ content: rank, color: suit }); // content=rank, color=suit
+            });
+        });
+
+        // Shuffle deck
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+        return deck;
+    }
+    
+    function showGameNotification(message) {
+      const notificationEl = document.getElementById('game-notification');
+      if (!notificationEl) return;
+      notificationEl.textContent = message;
+      notificationEl.classList.add('show');
+
+      clearTimeout(notificationTimeout);
+      notificationTimeout = setTimeout(() => {
+        notificationEl.classList.remove('show');
+      }, 2000); // Display for 2 seconds
+    }
+    
+    function updatePlayerHandUI() {
+        const handElement = document.getElementById('player-hand');
+        handElement.innerHTML = '';
+        const myTurn = isMyTurn();
+        
+        const hand = isSoloMode ? soloGame.playerHand : room.presence[room.clientId]?.cards;
+        if (!hand) return;
+        
+        const topCard = getTopCard();
+
+        hand.forEach((card, index) => {
+            const cardElement = createCardElement({ ...card, index });
+            cardElement.onclick = () => toggleCardSelection(index);
+            
+            if (myTurn) {
+                if (selectedCardsIndices.length > 0) {
+                     // Logic for follow-up selections
+                     const firstSelectedCard = hand[selectedCardsIndices[0]];
+                     if(card.content === firstSelectedCard.content) {
+                         cardElement.classList.add('playable');
+                     }
+                } else {
+                     // Logic for first selection
+                    if(canPlayCard(card, topCard)) {
+                        cardElement.classList.add('playable');
+                    }
+                }
+            }
+
+            if (selectedCardsIndices.includes(index)) {
+                cardElement.classList.add('selected');
+            }
+            handElement.appendChild(cardElement);
+        });
+        updatePointsButton();
+    }
+
+    function updateDiscardPileUI(topCard, isInitial) {
+        const pileElement = document.getElementById('discard-pile');
+        if (topCard) {
+            const cardEl = createCardElement(topCard);
+            cardEl.style.cursor = 'default';
+            if (!isInitial) {
+                cardEl.style.transform = `rotate(${Math.random()*20-10}deg) scale(0.1)`;
+                setTimeout(() => {
+                   cardEl.style.transform = `rotate(${Math.random()*10-5}deg) scale(1)`;
+                }, 10);
+            } else {
+                 cardEl.style.transform = `rotate(${Math.random()*10-5}deg)`;
+            }
+            
+            // Only keep a few cards in the DOM for performance
+            while (pileElement.children.length > 5) {
+                pileElement.removeChild(pileElement.firstChild);
+            }
+            pileElement.appendChild(cardEl);
+        } else {
+            pileElement.innerHTML = '';
+        }
+    }
+    
+    function updateCurrentColorUI(suit) {
+        const colorTextEl = document.getElementById('current-color-text');
+        if (colorTextEl) {
+          const suitName = suit ? suit.charAt(0).toUpperCase() + suit.slice(1) : 'None';
+          const color = (suit === 'hearts' || suit === 'diamonds') ? '#d32f2f' : 'white';
+          colorTextEl.innerHTML = `Current Suit: <span style="color: ${color}; text-transform: uppercase; font-weight: bold;">${suitName}</span>`;
+        }
+    }
+    
+    function canPlayCard(card, topCard) {
+        if (!topCard) return true; // Can play any card on an empty pile (first turn)
+        const currentSuit = isSoloMode ? soloGame.currentColor : room.roomState.currentColor;
+        const playConstraint = isSoloMode ? soloGame.playConstraint : null;
+
+        if (playConstraint) {
+            if (playConstraint.type === 'lessThan') {
+                 // Wilds can always be played
+                if (card.content === '8') return true;
+                // Card value must be less than or equal to constraint value AND match suit or be same value
+                return getCardValue(card.content) <= playConstraint.value && (card.color === currentSuit || card.content === topCard.content);
+            }
+        }
+
+        // '8' is wild
+        return card.content === '8' || card.color === currentSuit || card.content === topCard.content;
+    }
+
+    function isMyTurn() {
+        if (isSoloMode) return soloGame.currentTurn === 'player';
+        if (!room || !room.roomState) return false;
+        return room.roomState.currentTurn === room.clientId;
+    }
+
+    function getTopCard() {
+        const pile = isSoloMode ? soloGame.discardPile : room.roomState?.discardPile;
+        if (!pile || pile.length === 0) return null;
+        return pile[pile.length - 1];
+    }
+
+    function toggleCardSelection(index) {
+        if (!isMyTurn()) return;
+
+        const hand = isSoloMode ? soloGame.playerHand : room.presence[room.clientId]?.cards;
+        if (!hand) return;
+        
+        const card = hand[index];
+        const topCard = getTopCard();
+
+        const aPos = selectedCardsIndices.indexOf(index);
+        if (aPos !== -1) {
+            // Deselect
+            selectedCardsIndices.splice(aPos, 1);
+        } else {
+            // Select
+            if (selectedCardsIndices.length === 0) {
+                // First card
+                if (canPlayCard(card, topCard)) {
+                    selectedCardsIndices.push(index);
+                }
+            } else {
+                // Subsequent card, must match content
+                const firstSelectedCard = hand[selectedCardsIndices[0]];
+                if (card.content === firstSelectedCard.content) {
+                    selectedCardsIndices.push(index);
+                }
+            }
+        }
+        
+        document.getElementById('play-selected-button').style.display = selectedCardsIndices.length > 0 ? 'block' : 'none';
+        updatePlayerHandUI();
+    }
+    
+    function playSelectedCards() {
+        if (!isMyTurn() || selectedCardsIndices.length === 0) return;
+
+        if (isSoloMode) {
+            soloPlaySelectedCards();
+            return;
+        }
+
+        const myPresence = room.presence[room.clientId];
+        const hand = [...myPresence.cards];
+        
+        // Sort selected cards by their index in hand to avoid issues when splicing
+        selectedCardsIndices.sort((a,b) => b-a);
+        
+        let playedCardsObjects = selectedCardsIndices.map(index => ({...hand[index], originalIndex: index}));
+        
+        // Re-order played cards so the one matching the current suit is NOT last
+        const currentSuit = room.roomState.currentColor;
+        const suitMatchIndex = playedCardsObjects.findIndex(c => c.color === currentSuit);
+        if (suitMatchIndex !== -1 && playedCardsObjects.length > 1) {
+            // If a card matching the suit exists, move it to be first in the sequence (played first)
+            // so a different card will be on top to change the suit.
+            const matchingCard = playedCardsObjects.splice(suitMatchIndex, 1)[0];
+            playedCardsObjects.unshift(matchingCard);
+        }
+        
+        const playedCards = playedCardsObjects.map(c => ({content: c.content, color: c.color}));
+        
+        const newHand = [...hand];
+        // Splice from hand using original indices
+        playedCardsObjects.forEach(cardObj => {
+            // Find the correct current position of the card to splice, as indices shift
+            const handIndexToRemove = newHand.findIndex((card, idx) => 
+                hand.indexOf(card, idx) === cardObj.originalIndex
+            );
+            if (handIndexToRemove !== -1) {
+                 newHand.splice(handIndexToRemove, 1);
+            }
+        });
+
+        const lastCard = playedCards[playedCards.length - 1];
+        
+        // Temporarily store the cards. If a wild is played, we wait for suit selection.
+        tempWildCard = { cards: playedCards };
+
+        room.updatePresence({ cards: newHand });
+
+        // Multiplayer special cards are not implemented per request, but a basic framework
+        // would go here. For now, it just ends the turn.
+        if (lastCard.content === '8') { // '8' is the new wild
+            document.getElementById('color-picker').style.display = 'flex';
+        } else {
+            room.send({
+                type: 'playCards',
+                cards: playedCards,
+                newColor: lastCard.color // newColor is newSuit
+            });
+            tempWildCard = null; // Clear temp
+        }
+        
+        selectedCardsIndices = [];
+        document.getElementById('play-selected-button').style.display = 'none';
+        updatePlayerHandUI();
+    }
+
+    function playCard(index) {
+        // This function is now deprecated in favor of selection.
+        // Keeping it around in case any old logic paths call it, but should be transitioned.
+        console.warn("playCard is deprecated. Use toggleCardSelection and playSelectedCards.");
+        toggleCardSelection(index);
+        if(selectedCardsIndices.length > 0) {
+            playSelectedCards();
+        }
+    }
+    
+    function selectSuit(suit) {
+        document.getElementById('color-picker').style.display = 'none';
+        
+        if (isSoloMode) {
+            soloGame.currentColor = suit;
+            updateSoloMoveHistory(`You changed the suit to ${suitSymbols[suit]}.`);
+            const lastCard = soloGame.discardPile[soloGame.discardPile.length - 1];
+            advanceTurn(); // Advance turn AFTER color is selected
+            return;
+        }
+
+        if (!tempWildCard || !tempWildCard.cards) return;
+        
+        room.send({
+            type: 'playCards',
+            cards: tempWildCard.cards,
+            newColor: suit
+        });
+        tempWildCard = null;
+    }
+
+    function callDobon() {
+        if (isSoloMode) {
+            soloCallDobon();
+        } else {
+            if (!room || !room.roomState || !room.roomState.gameStarted) return;
+            room.send({ type: 'dobonCall' });
+        }
+    }
+
+    function soloCallDobon() {
+        if (!soloGame.gameStarted) return;
+
+        // Check if there's a play to call DOBON on.
+        if (!soloGame.lastPlayedCards || !soloGame.lastPlayerId) {
+            showGameNotification("No recent play to call DOBON on!");
+            return;
+        }
+
+        // Player cannot call DOBON on their own move.
+        if (soloGame.lastPlayerId === 'player') {
+            showGameNotification("You can't call DOBON on your own move!");
+            return;
+        }
+
+        const playerHandValue = calculateHandValue(soloGame.playerHand);
+        const lastPlayValue = calculateHandValue(soloGame.lastPlayedCards);
+
+        showGameNotification("DOBON!");
+
+        if (playerHandValue === lastPlayValue) {
+            // Successful DOBON
+            setTimeout(() => {
+                endSoloRoundWithDobon('player', soloGame.lastPlayerId);
+            }, 1000); // Delay to show notification
+        } else {
+            // Failed DOBON
+            setTimeout(() => {
+                showGameNotification(`Wrong call! Your hand (${playerHandValue}) doesn't match the play (${lastPlayValue}). Penalty!`);
+
+                // Draw 2 penalty cards
+                for (let i = 0; i < 2; i++) {
+                    if (soloGame.deck.length === 0) {
+                        if (soloGame.discardPile.length <= 1) break; // No cards to reshuffle
+                        const topCard = soloGame.discardPile.pop();
+                        soloGame.deck = [...soloGame.discardPile];
+                        soloGame.discardPile = [topCard];
+                    }
+                    if (soloGame.deck.length > 0) {
+                        soloGame.playerHand.push(soloGame.deck.pop());
+                    }
+                }
+                updatePlayerHandUI();
+                updatePointsButton(); // Update the dobon button value
+            }, 1500);
+        }
+    }
+
+    function drawCard() {
+        if (!isMyTurn()) return;
+        if (selectedCardsIndices.length > 0) return; // Can't draw if cards are selected
+        if(isSoloMode) {
+            soloDrawCard();
+        } else {
+            room.send({ type: 'drawCard' });
+        }
+    }
+    
+    function leaveLobby() {
+        window.location.reload();
+    }
+    
+    function confirmExit() {
+        document.getElementById('confirm-exit-modal').style.display = 'flex';
+    }
+
+    function updateGameSettings() {
+        if (!room || !room.roomState || room.roomState.hostId !== room.clientId) return;
+        const rounds = document.getElementById('rounds-select').value;
+        room.updateRoomState({
+            gameSettings: {
+                roundsToWin: parseInt(rounds, 10)
+            }
+        });
+    }
+
+    // --- Multiplayer Logic ---
+    async function createServer() {
+        isSoloMode = false;
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('waiting-message').style.display = 'flex';
+        
+        room = new WebsimSocket();
+        await room.initialize();
+        
+        room.subscribeRoomState(handleRoomStateUpdate);
+        room.subscribePresence(handlePresenceUpdate);
+        room.subscribePresenceUpdateRequests(handlePresenceRequest);
+        
+        // This event fires for everyone, including self
+        room.onmessage = (event) => {
+            const { data, clientId } = event; // Websim includes clientId of sender in event.data
+            
+            if (data.type === 'roundOver') {
+                displayRoundScores(data.winnerId, data.scores);
+            } else if (data.type === 'gameOver') {
+                displayFinalWinner(data.winnerId, data.scores);
+            } else if (data.type === 'gameNotification') {
+                showGameNotification(data.message);
+            }
+
+            // Host-only logic to manage the game state
+            if (room && room.roomState && room.roomState.hostId === room.clientId) {
+                handleHostEvents(data, data.clientId);
+            }
+        };
+
+        const isHost = Object.keys(room.peers).length === 1;
+        if (isHost) {
+            document.getElementById('rounds-select').disabled = false;
+            room.updateRoomState({
+                hostId: room.clientId,
+                gameStarted: false,
+                moveHistory: {0: "Lobby created."},
+                gameSettings: { roundsToWin: 5 },
+                scores: {},
+                currentRound: 1,
+                lastPlayedCards: null,
+                lastPlayerId: null,
+            });
+        } else {
+             document.getElementById('rounds-select').disabled = true;
+        }
+        room.updatePresence({ isReady: false, cards: [], score: 0 });
+    }
+    
+    function handleRoomStateUpdate(state) {
+        if (!state || !room) return;
+
+        if (state.gameStarted) {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('waiting-message').style.display = 'none';
+            document.getElementById('game-container').style.display = 'flex';
+            
+            document.getElementById('players-list').classList.remove('solo-mode');
+
+            if (state.gameSettings) {
+                document.getElementById('round-number').textContent = state.currentRound || 1;
+                document.getElementById('total-rounds').textContent = state.gameSettings.roundsToWin || 5;
+            }
+
+            const topCard = getTopCard();
+            // In multiplayer, don't animate every card for every player on every state change.
+            // A better system would use events for plays. For now, just update top card.
+            if (document.getElementById('discard-pile').lastChild?.dataset.content !== topCard.content || document.getElementById('discard-pile').lastChild?.dataset.color !== topCard.color) {
+               updateDiscardPileUI(topCard, true);
+            }
+
+            updateCurrentColorUI(state.currentColor);
+
+            const myTurn = isMyTurn();
+            const currentPlayerNameEl = document.getElementById('current-player-name');
+            const currentPlayerId = state.currentTurn;
+            const currentPlayer = currentPlayerId === room.clientId ? 'You' : room.peers[currentPlayerId]?.username || '...';
+            currentPlayerNameEl.textContent = myTurn ? 'Your Turn' : `${currentPlayer}'s Turn`;
+            currentPlayerNameEl.classList.toggle('my-turn', myTurn);
+            
+            updateMoveHistory(state.moveHistory);
+
+            if (myTurn) {
+                document.getElementById('draw-pile').classList.remove('disabled');
+            } else {
+                document.getElementById('draw-pile').classList.add('disabled');
+            }
+
+            updatePlayerHandUI();
+
+        } else {
+             // Lobby state
+             if (state.gameSettings) {
+                const roundsSelect = document.getElementById('rounds-select');
+                roundsSelect.value = state.gameSettings.roundsToWin || 5;
+                roundsSelect.disabled = room.roomState.hostId !== room.clientId;
+             }
+             document.getElementById('game-container').style.display = 'none';
+             document.getElementById('winner-overlay').style.display = 'none';
+             updateReadyStatus();
+        }
+        updatePlayersList();
+    }
+    
+    function handlePresenceUpdate() {
+        if (!room || !room.roomState) return;
+
+        if (room.roomState.gameStarted) {
+            updatePlayerHandUI();
+            updatePointsButton();
+        } else {
+            updateReadyStatus();
+        }
+        updatePlayersList();
+    }
+    
+    function handlePresenceRequest(update, fromId) {
+        // Only accept requests from the host
+        if (!room || !room.roomState || fromId !== room.roomState.hostId) return;
+
+        const myPresence = room.presence[room.clientId];
+
+        switch (update.type) {
+            case 'dealCards':
+                room.updatePresence({ ...myPresence, cards: update.cards });
+                break;
+            case 'updateScore':
+                room.updatePresence({ ...myPresence, score: update.score });
+                break;
+            case 'addCards':
+                const currentCards = myPresence.cards || [];
+                room.updatePresence({ ...myPresence, cards: [...currentCards, ...update.cards] });
+                break;
+        }
+    }
+
+    function toggleReady() {
+        if (!room) return;
+        const currentPresence = room.presence[room.clientId];
+        room.updatePresence({ isReady: !currentPresence.isReady });
+    }
+    
+    function updateReadyStatus() {
+        const statusDiv = document.getElementById('ready-status');
+        const startButton = document.getElementById('start-button');
+        statusDiv.innerHTML = '';
+
+        if (!room || !room.peers || !room.roomState) return;
+
+        const playerIds = Object.keys(room.peers);
+        const allReady = playerIds.length > 1 && playerIds.every(id => room.presence[id]?.isReady);
+        const isHost = room.roomState.hostId === room.clientId;
+
+        playerIds.forEach(clientId => {
+            const peer = room.peers[clientId];
+            const presence = room.presence[clientId];
+            const isReady = presence?.isReady || false;
+            
+            const playerDiv = document.createElement('div');
+            playerDiv.className = 'ready-player';
+            if(isReady) playerDiv.classList.add('is-ready');
+            if(clientId === room.roomState.hostId) playerDiv.classList.add('is-host');
+            
+            playerDiv.innerHTML = `
+              <span>${peer.username}</span>
+              <span>${isReady ? '✅ Ready' : '⏳ Not Ready'}</span>
+            `;
+            statusDiv.appendChild(playerDiv);
+        });
+
+        if (isHost) {
+            startButton.style.display = 'block';
+            if (playerIds.length < 2) {
+                 startButton.disabled = true;
+                 startButton.textContent = "Need 2+ players";
+            } else {
+                 startButton.disabled = !allReady;
+                 startButton.textContent = "Start Game";
+            }
+        } else {
+            startButton.style.display = 'none';
+        }
+    }
+    
+    function updatePlayersList() {
+        const playersList = document.getElementById('players-list-top');
+        playersList.innerHTML = '';
+        
+        if (isSoloMode) {
+            // Show player first
+            const playerInfo = document.createElement('div');
+            playerInfo.className = 'player-info';
+            if ('player' === soloGame.currentTurn) {
+                playerInfo.classList.add('current-turn');
+            }
+            playerInfo.innerHTML = `
+                <img class="player-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E👤%3C/text%3E%3C/svg%3E" title="You">
+                <div class="player-details">
+                    <span>You</span>
+                    <span class="player-score">Score: ${soloGame.scores?.player || 0}</span>
+                </div>
+                <span class="card-count">${soloGame.playerHand?.length || 0} cards</span>
+            `;
+            playersList.appendChild(playerInfo);
+
+            botPlayers.forEach(bot => {
+                const botInfo = document.createElement('div');
+                botInfo.className = 'player-info';
+                if (bot.id === soloGame.currentTurn) {
+                    botInfo.classList.add('current-turn');
+                }
+                 botInfo.innerHTML = `
+                    <div class="player-avatar" style="background: #333; justify-content: center; align-items: center; display: flex; font-size: 24px;">🤖</div>
+                    <div class="player-details">
+                        <span>${bot.name}</span>
+                        <span class="player-score">Score: ${bot.score || 0}</span>
+                    </div>
+                    <span class="card-count">${bot.cards?.length || 0} cards</span>
+                `;
+                playersList.appendChild(botInfo);
+            });
+            return;
+        }
+
+        if (!room || !room.roomState || !room.peers) return;
+
+        const playerIds = room.roomState.playerOrder || Object.keys(room.peers);
+
+        playerIds.forEach(playerId => {
+            const peer = room.peers[playerId];
+            const presence = room.presence[playerId];
+            if (!peer || !presence) return;
+
+            const playerInfo = document.createElement('div');
+            playerInfo.className = 'player-info';
+            if (playerId === room.roomState.currentTurn) {
+                playerInfo.classList.add('current-turn');
+            }
+            playerInfo.innerHTML = `
+                <img class="player-avatar" src="${peer.avatarUrl}" title="${peer.username}">
+                <div class="player-details">
+                    <span>${peer.username}</span>
+                    <span class="player-score">Score: ${presence.score || 0}</span>
+                </div>
+                <span class="card-count">${presence.cards?.length || 0} cards</span>
+            `;
+            playersList.appendChild(playerInfo);
+        });
+    }
+
+    function startMultiplayerGame() {
+        if (!room || room.roomState.hostId !== room.clientId) return;
+        
+        const playerOrder = room.roomState.playerOrder || Object.keys(room.peers); 
+        
+        const deck = initializeDeck();
+        const hands = {};
+        const scores = room.roomState.scores || {};
+        playerOrder.forEach(id => {
+            hands[id] = [];
+            if (!scores[id]) {
+                scores[id] = 0;
+            }
+        });
+
+        for (let i = 0; i < 5; i++) { // DEALS 5 CARDS
+            for (const playerId of playerOrder) {
+                hands[playerId].push(deck.pop());
+            }
+        }
+        
+        let topCard = deck.pop();
+        // First card cannot be a wild 8
+        while (topCard.content === '8') {
+            deck.push(topCard);
+            topCard = deck.pop();
+        }
+
+        const starterId = room.roomState.nextRoundStarterId || playerOrder[0];
+
+        room.updateRoomState({
+            gameStarted: true,
+            deck: deck,
+            discardPile: [topCard],
+            currentColor: topCard.color, // suit
+            currentTurn: starterId,
+            direction: 1, // 1 for clockwise, -1 for counter-clockwise
+            playerOrder: playerOrder,
+            moveHistory: {0: `Round ${room.roomState.currentRound || 1} has started!`},
+            scores: scores,
+            playConstraint: null,
+            lastPlayedCards: null, // Reset for new round
+            lastPlayerId: null,
+            nextRoundStarterId: null // Consume starter id
+        });
+
+        Object.entries(hands).forEach(([playerId, cards]) => {
+            if (playerId === room.clientId) {
+                room.updatePresence({ cards, score: scores[playerId] });
+            } else {
+                room.requestPresenceUpdate(playerId, { type: 'dealCards', cards });
+                room.requestPresenceUpdate(playerId, { type: 'updateScore', score: scores[playerId] });
+            }
+        });
+    }
+
+    function updateMoveHistory(history) {
+        const historyEl = document.getElementById('move-history');
+        historyEl.innerHTML = '';
+        if (!history) return;
+        const keys = Object.keys(history).sort((a,b) => b-a); // Show newest first
+        keys.forEach(key => {
+            const p = document.createElement('p');
+            p.textContent = history[key];
+            historyEl.appendChild(p);
+        });
+    }
+    
+    function displayRoundScores(winnerId, data) {
+        const winnerName = isSoloMode ? (winnerId === 'player' ? 'You' : botPlayers.find(b=>b.id===winnerId).name) : (room.peers[winnerId] ? room.peers[winnerId].username : 'Someone');
+
+        let titleText = `${winnerName} won the round!`;
+        if (data.dobon) {
+            const targetName = isSoloMode ? (data.targetId === 'player' ? 'you' : botPlayers.find(b=>b.id===data.targetId).name) : room.peers[data.targetId]?.username;
+            titleText = `${winnerName} called DOBON! on ${targetName}!`;
+        }
+        document.getElementById('winner-name').innerText = titleText;
+        
+        const scoreDetails = document.getElementById('score-details');
+        scoreDetails.innerHTML = '';
+        Object.entries(data.scores).forEach(([id, score]) => {
+            const name = isSoloMode ? (id === 'player' ? 'You' : botPlayers.find(b=>b.id===id).name) : room.peers[id]?.username;
+             if (name) {
+                const row = document.createElement('div');
+                row.className = 'score-row';
+                row.innerHTML = `<div><span class="player-name">${name}</span></div><div><span class="player-score-value">${score} pts</span></div>`;
+                
+                if (data.hands && data.hands[id] && data.hands[id].length > 0) {
+                    const handDiv = document.createElement('div');
+                    handDiv.className = 'end-of-round-hand';
+                    handDiv.innerHTML = `<em>Remaining Cards:</em>`;
+                    
+                    const cardsContainer = document.createElement('div');
+                    cardsContainer.className = 'hand-cards';
+                    data.hands[id].forEach(card => {
+                        cardsContainer.appendChild(createCardElement(card));
+                    });
+                    handDiv.appendChild(cardsContainer);
+                    row.appendChild(handDiv);
+                }
+                scoreDetails.appendChild(row);
+            }
+        });
+
+        if (isSoloMode) {
+            document.getElementById('next-round-button').onclick = startNextSoloRound;
+        } else if (room.roomState.hostId === room.clientId) {
+            document.getElementById('next-round-button').style.display = 'block';
+        } else {
+            document.getElementById('next-round-button').style.display = 'none';
+            document.getElementById('winner-name').innerText += '\n(Waiting for host to start next round)';
+        }
+
+        document.getElementById('winner-overlay').style.display = 'flex';
+    }
+
+    function displayFinalWinner(winnerId, scores) {
+        const winnerData = isSoloMode ? {
+            name: (winnerId === 'player' ? 'You' : botPlayers.find(b=>b.id===winnerId).name)
+        } : room.peers[winnerId];
+
+        document.getElementById('winner-name').innerText = `${winnerData.name} has won the game!`;
+
+        const scoreDetails = document.getElementById('score-details');
+        scoreDetails.innerHTML = '';
+        Object.entries(scores).forEach(([id, score]) => {
+            const name = isSoloMode ? (id === 'player' ? 'You' : botPlayers.find(b=>b.id===id).name) : room.peers[id]?.username;
+             if (name) {
+                const row = document.createElement('div');
+                row.className = 'score-row';
+                row.innerHTML = `<span class="player-name">${name}</span><span class="player-score-value">${score}</span>`;
+                scoreDetails.appendChild(row);
+            }
+        });
+
+        document.getElementById('next-round-button').style.display = 'none';
+        document.getElementById('back-to-menu-button').style.display = 'block';
+        document.getElementById('winner-overlay').style.display = 'flex';
+    }
+
+
+    function startNextRound() {
+        if (room.roomState.hostId !== room.clientId) return;
+        startMultiplayerGame(); // Re-deals and resets board
+    }
+
+    // --- Solo Mode Logic ---
+    function showAiSetup() {
+        document.getElementById('ai-setup-modal').style.display = 'flex';
+    }
+
+    function hideAiSetup() {
+        document.getElementById('ai-setup-modal').style.display = 'none';
+    }
+
+    function startAiGame() {
+        const numBots = parseInt(document.getElementById('ai-players-select').value, 10);
+        const roundsToWin = parseInt(document.getElementById('ai-rounds-select').value, 10);
+        hideAiSetup();
+        startSoloMode({numBots, roundsToWin});
+    }
+
+    function startSoloMode({numBots, roundsToWin}) {
+        isSoloMode = true;
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('game-container').style.display = 'flex';
+        document.getElementById('winner-overlay').style.display = 'none';
+
+        botPlayers = [];
+        for (let i = 0; i < numBots; i++) {
+            botPlayers.push({ id: `bot${i}`, name: `Bot ${i+1}`, cards: [], score: 0 });
+        }
+        
+        soloGame = {
+            playerHand: [],
+            deck: [],
+            discardPile: [],
+            currentColor: '', // suit
+            playerOrder: ['player', ...botPlayers.map(b => b.id)],
+            currentTurn: '',
+            direction: 1,
+            gameStarted: true,
+            moveHistory: {},
+            currentRound: 1,
+            roundsToWin: roundsToWin,
+            scores: { player: 0, ...Object.fromEntries(botPlayers.map(b => [b.id, 0])) },
+            nextRoundStarterId: null, // For loser starts next round rule
+            playConstraint: null, // For card '5' rule
+            lastPlayedCards: null,
+            lastPlayerId: null,
+        };
+        document.getElementById('round-number').textContent = soloGame.currentRound;
+        document.getElementById('total-rounds').textContent = soloGame.roundsToWin;
+        startNextSoloRound();
+    }
+    
+    function startNextSoloRound() {
+        document.getElementById('winner-overlay').style.display = 'none';
+        const deck = initializeDeck();
+        
+        soloGame.playerHand = [];
+        botPlayers.forEach(b => b.cards = []);
+
+        // Deal cards
+        for (let i = 0; i < 5; i++) { // DEALS 5 CARDS
+            for (const pId of soloGame.playerOrder) {
+                if (pId === 'player') {
+                    soloGame.playerHand.push(deck.pop());
+                } else {
+                    botPlayers.find(b => b.id === pId).cards.push(deck.pop());
+                }
+            }
+        }
+        
+        let topCard = deck.pop();
+        while (topCard.content === '8') {
+            deck.push(topCard);
+            topCard = deck.pop();
+        }
+        
+        soloGame.deck = deck;
+        soloGame.discardPile = [topCard];
+        soloGame.currentColor = topCard.color;
+        soloGame.currentTurn = soloGame.nextRoundStarterId || soloGame.playerOrder[Math.floor(Math.random() * soloGame.playerOrder.length)];
+        soloGame.nextRoundStarterId = null; // Consume the starter ID
+        soloGame.moveHistory = {0: `Round ${soloGame.currentRound} started! ${soloGame.currentTurn === 'player' ? 'You start' : botPlayers.find(b=>b.id===soloGame.currentTurn).name + ' starts'}.`};
+        soloGame.playConstraint = null;
+        soloGame.lastPlayedCards = null; // Reset for new round
+        soloGame.lastPlayerId = null;
+
+        updateSoloMoveHistory(`First card is ${topCard.content} of ${suitSymbols[topCard.color]}.`);
+        handleSpecialCardEffect(topCard, true); // Handle initial card effects
+        checkTurn();
+        
+        updateFullUI();
+    }
+
+
+    function soloPlaySelectedCards() {
+        if (selectedCardsIndices.length === 0) return;
+
+        selectedCardsIndices.sort((a,b) => b-a); // Sort descending to splice correctly
+        
+        let playedCardObjects = selectedCardsIndices.map(index => soloGame.playerHand[index]);
+
+        // Reorder selected cards if multiple are played
+        const currentSuit = soloGame.currentColor;
+        const suitMatchIndex = playedCardObjects.findIndex(c => c.color === currentSuit);
+        if(suitMatchIndex !== -1 && playedCardObjects.length > 1) {
+            // Move the suit-matching card to be the first one played, not the last one.
+            const matchingCard = playedCardObjects.splice(suitMatchIndex, 1)[0];
+            playedCardObjects.unshift(matchingCard);
+        }
+
+        // Remove cards from hand
+        playedCardObjects.forEach(cardToPlay => {
+            const indexInHand = soloGame.playerHand.findIndex(c => c === cardToPlay);
+            if(indexInHand > -1) {
+                soloGame.playerHand.splice(indexInHand, 1);
+            }
+        });
+        
+        const playedCards = playedCardObjects;
+        const lastCard = playedCards[playedCards.length - 1];
+
+        playedCards.forEach(card => {
+            soloGame.discardPile.push(card);
+            updateDiscardPileUI(card);
+        });
+        
+        soloGame.lastPlayedCards = playedCards;
+        soloGame.lastPlayerId = 'player';
+        
+        const cardText = playedCards.length > 1 ? `${playedCards.length}x ${lastCard.content}` : `${lastCard.content} of ${suitSymbols[lastCard.color]}`;
+        updateSoloMoveHistory(`You played ${cardText}.`);
+
+        if (soloGame.playerHand.length === 0) {
+            endSoloRound('player');
+            return;
+        }
+
+        if (lastCard.content === '8') {
+            document.getElementById('color-picker').style.display = 'flex';
+        } else {
+            soloGame.currentColor = lastCard.color;
+            handleSpecialCardEffect(lastCard);
+            advanceTurn();
+        }
+        
+        selectedCardsIndices = [];
+        document.getElementById('play-selected-button').style.display = 'none';
+        updatePlayerHandUI();
+    }
+
+
+    function soloPlayCard(index) {
+        // Deprecated, use selection logic
+        toggleCardSelection(index);
+        if (selectedCardsIndices.length > 0) {
+             soloPlaySelectedCards();
+        }
+    }
+
+    function soloDrawCard() {
+        if (selectedCardsIndices.length > 0) return;
+        if(soloGame.deck.length === 0) {
+             // Reshuffle discard pile into deck
+            if (soloGame.discardPile.length <= 1) return; // Not enough cards
+            const topCard = soloGame.discardPile.pop();
+            soloGame.deck = [...soloGame.discardPile];
+            soloGame.discardPile = [topCard];
+        }
+        const newCard = soloGame.deck.pop();
+        soloGame.playerHand.push(newCard);
+        updateSoloMoveHistory('You drew a card.');
+        updatePlayerHandUI();
+        soloGame.playConstraint = null; // Drawing satisfies the constraint
+        advanceTurn(); // Player's turn ends after drawing
+    }
+    
+    function botTurn() {
+        const botId = soloGame.currentTurn;
+        const bot = botPlayers.find(b => b.id === botId);
+        const topCard = getTopCard();
+        let playedCard = null;
+        let playedCards = [];
+
+        // Simple Bot AI: find first playable card, and then check for more of the same
+        const playableIndices = [];
+        for(let i=0; i<bot.cards.length; i++) {
+            if(canPlayCard(bot.cards[i], topCard)){
+                playableIndices.push(i);
+            }
+        }
+        
+        if (playableIndices.length > 0) {
+            // Bot plays the first valid card it finds
+            const cardIndexToPlay = playableIndices[0];
+            const firstPlayable = bot.cards.splice(cardIndexToPlay, 1)[0];
+            playedCards.push(firstPlayable);
+
+            // Check for other cards with same content to play them all
+            for (let j = bot.cards.length - 1; j >= 0; j--) {
+                if (bot.cards[j].content === firstPlayable.content) {
+                    playedCards.push(bot.cards.splice(j, 1)[0]);
+                }
+            }
+        }
+
+        if(playedCards.length > 0) {
+            const lastCard = playedCards[playedCards.length - 1];
+            
+            playedCards.forEach(c => {
+                 soloGame.discardPile.push(c);
+                 updateDiscardPileUI(c);
+            });
+            
+            soloGame.lastPlayedCards = playedCards;
+            soloGame.lastPlayerId = bot.id;
+            
+            const cardText = playedCards.length > 1 ? `${playedCards.length}x ${lastCard.content}` : `${lastCard.content} of ${suitSymbols[lastCard.color]}`;
+            updateSoloMoveHistory(`${bot.name} played ${cardText}.`);
+
+            if(bot.cards.length === 0) {
+                endSoloRound(bot.id);
+                return;
+            }
+
+            if(lastCard.content === '8') {
+                soloGame.currentColor = botChooseColor(bot);
+                 updateSoloMoveHistory(`${bot.name} changed suit to ${soloGame.currentColor}.`);
+            } else {
+                soloGame.currentColor = lastCard.color;
+            }
+            handleSpecialCardEffect(lastCard);
+        } else {
+            // Draw card
+             if(soloGame.deck.length === 0) {
+                if (soloGame.discardPile.length <= 1) { advanceTurn(); return; }
+                const topCardFromPile = soloGame.discardPile.pop();
+                soloGame.deck = [...soloGame.discardPile];
+                soloGame.discardPile = [topCardFromPile];
+             }
+            const newCard = soloGame.deck.pop();
+            bot.cards.push(newCard);
+            updateSoloMoveHistory(`${bot.name} drew a card.`);
+        }
+        
+        advanceTurn();
+    }
+    
+    function botChooseColor(bot) {
+        const colorCounts = {hearts:0, diamonds:0, clubs:0, spades:0};
+        bot.cards.forEach(c => {
+            if(c.content !== '8') colorCounts[c.color]++;
+        });
+        return Object.keys(colorCounts).reduce((a, b) => colorCounts[a] > colorCounts[b] ? a : b);
+    }
+    
+    function handleSpecialCardEffect(card, isInitialCard = false) {
+        let nextPlayerIndex;
+        let targetPlayerId;
+        const currentPlayerId = isInitialCard ? null : soloGame.currentTurn;
+        const playerName = isInitialCard ? "Initial card" : (currentPlayerId === 'player' ? "You" : botPlayers.find(b=>b.id===currentPlayerId).name);
+        const nextPlayerId = soloGame.playerOrder[getNextPlayerIndex(0)];
+        const nextPlayerName = nextPlayerId === 'player' ? "Your" : botPlayers.find(b => b.id === nextPlayerId).name + "'s";
+        
+        // Reset constraint unless a 5 is played
+        if (card.content !== '5') {
+            soloGame.playConstraint = null;
+        }
+
+        switch(card.content) {
+            case 'A': // Skip
+                updateSoloMoveHistory(`${playerName} played a Skip! Next player is skipped.`);
+                showGameNotification(`${nextPlayerName} turn skipped!`);
+                soloGame.currentTurn = soloGame.playerOrder[getNextPlayerIndex(1)];
+                break;
+            case '9': // Reverse
+                soloGame.direction *= -1;
+                const dir = soloGame.direction === 1 ? "clockwise" : "counter-clockwise";
+                updateSoloMoveHistory(`${playerName} played a Reverse! Play is now ${dir}.`);
+                showGameNotification(`Play reversed!`);
+                break;
+            case '2':
+                nextPlayerIndex = getNextPlayerIndex(0);
+                targetPlayerId = soloGame.playerOrder[nextPlayerIndex];
+                drawCardsForPlayer(targetPlayerId, 2);
+                const targetNameForMsg = targetPlayerId === 'player' ? 'You draw' : botPlayers.find(b=>b.id===targetPlayerId).name + ' draws';
+                updateSoloMoveHistory(`${playerName} played a +2. ${targetNameForMsg} 2 cards!`);
+                showGameNotification(`+2 Cards!`);
+                soloGame.currentTurn = soloGame.playerOrder[getNextPlayerIndex(1)];
+                break;
+            case '5':
+                nextPlayerIndex = getNextPlayerIndex(0);
+                targetPlayerId = soloGame.playerOrder[nextPlayerIndex];
+                const targetName = targetPlayerId === 'player' ? 'You' : botPlayers.find(b=>b.id===targetPlayerId).name;
+                updateSoloMoveHistory(`${playerName} played a 5! ${targetName} must play a card with value 5 or less.`);
+                showGameNotification(`${targetName}, play 5 or less!`);
+                soloGame.playConstraint = { type: 'lessThan', value: 5 };
+                break;
+            case '8': // Wild card
+                if (!isInitialCard) { // Color is chosen by player/bot, message is logged there
+                    updateSoloMoveHistory(`${playerName} played a Wild card.`);
+                    showGameNotification('Wild Card! New suit chosen.');
+                }
+                break;
+        }
+    }
+
+    function drawCardsForPlayer(playerId, count) {
+        const target = playerId === 'player' ? soloGame.playerHand : botPlayers.find(b => b.id === playerId).cards;
+        for(let i = 0; i < count; i++) {
+            if(soloGame.deck.length === 0) break;
+            target.push(soloGame.deck.pop());
+        }
+        const playerName = playerId === 'player' ? 'You' : botPlayers.find(b=>b.id===playerId).name;
+        // Message is now logged in handleSpecialCardEffect
+    }
+    
+    function getNextPlayerIndex(offset = 0) {
+        const currentIndex = soloGame.playerOrder.indexOf(soloGame.currentTurn);
+        const nextIndex = (currentIndex + (soloGame.direction * (1 + offset)) + soloGame.playerOrder.length) % soloGame.playerOrder.length;
+        return nextIndex;
+    }
+
+    function advanceTurn() {
+        // The effect of the card has already been applied, so we just get the next player
+        soloGame.currentTurn = soloGame.playerOrder[getNextPlayerIndex(0)];
+        updateFullUI();
+        checkTurn();
+    }
+    
+    function checkTurn(){
+        if(soloGame.currentTurn !== 'player') {
+            // Bot might call dobon
+            setTimeout(() => {
+                const bot = botPlayers.find(b => b.id === soloGame.currentTurn);
+                if (soloGame.lastPlayedCards && soloGame.lastPlayerId !== bot.id) {
+                    const botHandValue = calculateHandValue(bot.cards);
+                    const lastPlayValue = calculateHandValue(soloGame.lastPlayedCards);
+                    // Bot has a 50% chance to call a correct dobon
+                    if (botHandValue === lastPlayValue && Math.random() < 0.5) {
+                        showGameNotification(`${bot.name} calls DOBON!`);
+                        endSoloRoundWithDobon(bot.id, soloGame.lastPlayerId);
+                        return;
+                    }
+                }
+                botTurn();
+            }, 1200);
+        }
+    }
+    
+    function updateFullUI() {
+        const myTurn = isMyTurn();
+        const currentPlayerNameEl = document.getElementById('current-player-name');
+        const currentPlayerId = soloGame.currentTurn;
+        const currentPlayer = currentPlayerId === 'player' ? 'You' : botPlayers.find(b => b.id === currentPlayerId)?.name;
+        currentPlayerNameEl.textContent = myTurn ? 'Your Turn' : `${currentPlayer}'s Turn`;
+        currentPlayerNameEl.classList.toggle('my-turn', myTurn);
+        
+        updateMoveHistory(soloGame.moveHistory);
+        document.getElementById('round-number').textContent = soloGame.currentRound;
+        document.getElementById('total-rounds').textContent = soloGame.roundsToWin;
+        
+        document.getElementById('draw-pile').classList.toggle('disabled', !myTurn || selectedCardsIndices.length > 0);
+
+        updatePlayerHandUI();
+        updatePlayersList();
+        updateCurrentColorUI(soloGame.currentColor);
+    }
+
+    function endSoloRound(winnerId) {
+        let roundScores = {};
+        const remainingHands = {};
+        let totalLoserPoints = 0;
+
+        // Calculate score from remaining cards
+        soloGame.playerOrder.forEach(pId => {
+            const hand = pId === 'player' ? soloGame.playerHand : botPlayers.find(b=>b.id===pId).cards;
+            remainingHands[pId] = [...hand]; // Store copy of hand for display
+            const handValue = calculateHandValue(hand);
+            if (pId !== winnerId) {
+                totalLoserPoints += handValue;
+            }
+            roundScores[pId] = handValue;
+        });
+        
+        soloGame.scores[winnerId] += totalLoserPoints;
+        botPlayers.forEach(b => b.score = soloGame.scores[b.id]);
+
+        // Determine who starts next round (player with most points in hand)
+        let maxScore = -1;
+        let nextStarter = null;
+        for (const pId of Object.keys(soloGame.scores)) {
+             if (pId === winnerId) continue;
+             if (roundScores[pId] > maxScore) {
+                maxScore = roundScores[pId];
+                nextStarter = pId;
+            }
+        }
+        soloGame.nextRoundStarterId = nextStarter;
+
+        if (soloGame.currentRound >= soloGame.roundsToWin) {
+            const finalWinnerId = Object.keys(soloGame.scores).reduce((a, b) => soloGame.scores[a] > soloGame.scores[b] ? a : b);
+            displayFinalWinner(finalWinnerId, soloGame.scores);
+        } else {
+            displayRoundScores(winnerId, {scores: soloGame.scores, hands: remainingHands});
+            soloGame.currentRound++;
+        }
+    }
+    
+    function endSoloRoundWithDobon(callerId, targetId) {
+        const remainingHands = {};
+        
+        const callerHand = callerId === 'player' ? soloGame.playerHand : botPlayers.find(b => b.id === callerId).cards;
+        const targetHand = targetId === 'player' ? soloGame.playerHand : botPlayers.find(b => b.id === targetId).cards;
+        
+        const penaltyPoints = calculateHandValue(callerHand) + 
+                              calculateHandValue(soloGame.lastPlayedCards) +
+                              calculateHandValue(targetHand);
+
+        soloGame.scores[targetId] += penaltyPoints;
+
+        // Other players get 0 points for the round, just show their hands.
+        soloGame.playerOrder.forEach(pId => {
+            const hand = pId === 'player' ? soloGame.playerHand : botPlayers.find(b=>b.id===pId).cards;
+            remainingHands[pId] = hand;
+        });
+        
+        botPlayers.forEach(b => b.score = soloGame.scores[b.id]);
+        soloGame.nextRoundStarterId = targetId; // Loser starts
+
+        if (soloGame.currentRound >= soloGame.roundsToWin) {
+             const finalWinnerId = Object.keys(soloGame.scores).reduce((a, b) => soloGame.scores[a] > soloGame.scores[b] ? a : b);
+             displayFinalWinner(finalWinnerId, soloGame.scores);
+        } else {
+            displayRoundScores(callerId, {scores: soloGame.scores, hands: remainingHands, dobon: true, targetId: targetId });
+            soloGame.currentRound++;
+        }
+    }
+
+
+    function calculateHandValue(cards) {
+        if (!cards || cards.length === 0) return 0;
+        return cards.reduce((sum, card) => sum + getCardValue(card.content), 0);
+    }
+    
+    function updatePointsButton() {
+        const hand = isSoloMode ? soloGame.playerHand : room.presence[room.clientId]?.cards;
+        const value = calculateHandValue(hand);
+        document.getElementById('hand-value-button').textContent = `Value: ${value}`;
+    }
+    
+    function updateSoloMoveHistory(move) {
+        const keys = Object.keys(soloGame.moveHistory);
+        const newHistory = {};
+        // Keep last 4 moves
+        for(let i=0; i < 4 && i < keys.length; i++) {
+            newHistory[i+1] = soloGame.moveHistory[keys[i]];
+        }
+        newHistory[0] = move;
+        soloGame.moveHistory = newHistory;
+    }
+
+    function handleHostEvents(data, fromClientId) {
+        const state = room.roomState;
+        if (!state.gameStarted) return;
+        
+        const fromPlayerIndex = state.playerOrder.indexOf(fromClientId);
+        
+        switch (data.type) {
+            case 'playCards':
+                if (state.currentTurn !== fromClientId) return;
+
+                const lastCard = data.cards[data.cards.length - 1];
+                let nextTurnIndex = (fromPlayerIndex + state.direction + state.playerOrder.length) % state.playerOrder.length;
+                let playConstraint = null;
+                let newDirection = state.direction;
+                let deck = [...state.deck];
+
+                // Handle special card effects
+                switch(lastCard.content) {
+                    case 'A': // Skip
+                        nextTurnIndex = (nextTurnIndex + newDirection + state.playerOrder.length) % state.playerOrder.length;
+                        room.send({ type: 'gameNotification', message: 'Turn Skipped!' });
+                        break;
+                    case '9': // Reverse
+                        newDirection *= -1;
+                        // Next player is in the new direction
+                        nextTurnIndex = (fromPlayerIndex + newDirection + state.playerOrder.length) % state.playerOrder.length;
+                        room.send({ type: 'gameNotification', message: 'Play Reversed!' });
+                        break;
+                    case '2':
+                        if (deck.length >= 2) {
+                            const targetPlayerId = state.playerOrder[nextTurnIndex];
+                            const twoCards = [deck.pop(), deck.pop()];
+                            room.requestPresenceUpdate(targetPlayerId, {type: 'addCards', cards: twoCards });
+                            nextTurnIndex = (nextTurnIndex + newDirection + state.playerOrder.length) % state.playerOrder.length;
+                            room.send({ type: 'gameNotification', message: '+2 Cards!' });
+                        }
+                        break;
+                    case '5':
+                         playConstraint = { type: 'lessThan', value: 5 };
+                         const nextPlayerName = room.peers[state.playerOrder[nextTurnIndex]].username;
+                         room.send({ type: 'gameNotification', message: `${nextPlayerName}, play 5 or less!` });
+                         break;
+                }
+                
+                const newHistory = {...state.moveHistory};
+                const historyKeys = Object.keys(newHistory).map(k => parseInt(k)).sort((a,b) => b-a);
+                const nextKey = (historyKeys[0] || 0) + 1;
+                newHistory[nextKey] = `${room.peers[fromClientId].username} played ${data.cards.length} card(s).`;
+
+                // Check for winner (player has no cards left)
+                if (room.presence[fromClientId]?.cards.length === 0) {
+                    let roundScores = {};
+                    const remainingHands = {};
+                    let totalLoserPoints = 0;
+                    const playerIds = state.playerOrder;
+
+                    playerIds.forEach(pId => {
+                        const hand = room.presence[pId]?.cards || [];
+                        remainingHands[pId] = hand;
+                        const handValue = calculateHandValue(hand);
+                        if (pId !== fromClientId) {
+                            totalLoserPoints += handValue;
+                        }
+                        roundScores[pId] = handValue;
+                    });
+                    
+                    const newScores = { ...state.scores };
+                    newScores[fromClientId] += totalLoserPoints;
+
+                    let maxScore = -1;
+                    let nextStarter = null;
+                    for (const pId of playerIds) {
+                         if (pId === fromClientId) continue;
+                         if (roundScores[pId] > maxScore) {
+                            maxScore = roundScores[pId];
+                            nextStarter = pId;
+                        }
+                    }
+
+                    const roundDataForEvent = {
+                        winnerId: fromClientId,
+                        scores: newScores,
+                        hands: remainingHands,
+                    };
+                    
+                    if (state.currentRound >= state.gameSettings.roundsToWin) {
+                         const finalWinnerId = Object.keys(newScores).reduce((a, b) => newScores[a] > newScores[b] ? a : b);
+                         room.send({ type: 'gameOver', winnerId: finalWinnerId, scores: newScores });
+                         room.updateRoomState({ gameStarted: false, scores: newScores });
+                    } else {
+                         room.send({ type: 'roundOver', ...roundDataForEvent });
+                         room.updateRoomState({
+                            gameStarted: false,
+                            scores: newScores,
+                            currentRound: state.currentRound + 1,
+                            nextRoundStarterId: nextStarter || playerIds.find(p => p !== fromClientId),
+                        });
+                    }
+                    return; 
+                }
+
+                room.updateRoomState({
+                    discardPile: [...state.discardPile, ...data.cards],
+                    currentColor: data.newColor,
+                    currentTurn: state.playerOrder[nextTurnIndex],
+                    deck: deck,
+                    direction: newDirection,
+                    playConstraint: playConstraint,
+                    lastPlayedCards: data.cards,
+                    lastPlayerId: fromClientId,
+                    moveHistory: newHistory,
+                });
+                break;
+            
+            case 'drawCard':
+                 if (state.currentTurn !== fromClientId) return;
+                 if (state.deck.length === 0) return;
+                 const newCard = state.deck.pop();
+                 room.requestPresenceUpdate(fromClientId, {type: 'addCards', cards: [newCard] });
+                 
+                 const drawNextIndex = (fromPlayerIndex + state.direction + state.playerOrder.length) % state.playerOrder.length;
+                 const newHistoryDraw = {...state.moveHistory};
+                 const historyKeysDraw = Object.keys(newHistoryDraw).map(k => parseInt(k)).sort((a,b) => b-a);
+                 const nextKeyDraw = (historyKeysDraw[0] || 0) + 1;
+                 newHistoryDraw[nextKeyDraw] = `${room.peers[fromClientId].username} drew a card.`;
+                 
+                 room.updateRoomState({
+                     deck: state.deck,
+                     currentTurn: state.playerOrder[drawNextIndex],
+                     playConstraint: null,
+                     moveHistory: newHistoryDraw,
+                 });
+                 break;
+
+            case 'dobonCall':
+                if (!state.lastPlayedCards || !state.lastPlayerId) {
+                     room.send({ type: 'gameNotification', message: 'No move to call DOBON on!' });
+                     return;
+                }
+                if (state.lastPlayerId === fromClientId) {
+                    room.send({ type: 'gameNotification', message: "Can't call DOBON on yourself!" });
+                    return;
+                }
+
+                const callerId = fromClientId;
+                const targetId = state.lastPlayerId;
+                const callerHand = room.presence[callerId]?.cards || [];
+                const callerHandValue = calculateHandValue(callerHand);
+                const lastPlayValue = calculateHandValue(state.lastPlayedCards);
+                
+                room.send({ type: 'gameNotification', message: `${room.peers[callerId].username} calls DOBON!` });
+                showGameNotification('DOBON!');
+
+                if (callerHandValue === lastPlayValue) {
+                    // SUCCESSFUL DOBON
+                    const targetHand = room.presence[targetId]?.cards || [];
+                    const penaltyPoints = calculateHandValue(targetHand) + callerHandValue + lastPlayValue;
+
+                    const newScores = { ...state.scores };
+                    newScores[targetId] += penaltyPoints;
+
+                    const remainingHands = {};
+                    state.playerOrder.forEach(pId => {
+                        remainingHands[pId] = room.presence[pId]?.cards || [];
+                    });
+
+                    const roundData = {
+                        winnerId: callerId,
+                        scores: newScores,
+                        hands: remainingHands,
+                        dobon: true,
+                        targetId: targetId
+                    };
+
+                    if (state.currentRound >= state.gameSettings.roundsToWin) {
+                         const finalWinnerId = Object.keys(newScores).reduce((a, b) => newScores[a] > newScores[b] ? a : b);
+                         room.send({ type: 'gameOver', winnerId: finalWinnerId, scores: newScores });
+                         room.updateRoomState({ gameStarted: false, scores: newScores });
+                    } else {
+                         room.send({ type: 'roundOver', ...roundData });
+                         room.updateRoomState({
+                            gameStarted: false,
+                            scores: newScores,
+                            currentRound: state.currentRound + 1,
+                            nextRoundStarterId: targetId, // Loser starts
+                        });
+                    }
+
+                } else {
+                    // FAILED DOBON
+                    if (state.deck.length >= 2) {
+                        const penaltyCards = [state.deck.pop(), state.deck.pop()];
+                        room.requestPresenceUpdate(callerId, { type: 'addCards', cards: penaltyCards });
+                        room.updateRoomState({ deck: state.deck });
+                        room.send({ type: 'gameNotification', message: `${room.peers[callerId].username} made a wrong call! +2 Penalty.` });
+                    } else {
+                         room.send({ type: 'gameNotification', message: 'Wrong call! No penalty cards left.' });
+                    }
+                }
+                break;
+        }
+    }
+
+    function showScoreboard() {
+        const overlay = document.getElementById('winner-overlay');
+        const isVisible = overlay.style.display === 'flex';
+        if (isVisible) {
+            overlay.style.display = 'none';
+        } else {
+            // Only show scoreboard if game is running.
+            // In a finished state, the normal logic handles it.
+            if ((isSoloMode && soloGame.gameStarted) || (room && room.roomState.gameStarted)) {
+                // Populate with current scores
+                const scores = isSoloMode ? soloGame.scores : room.roomState.scores;
+                document.getElementById('winner-name').innerText = "Current Scores";
+                const scoreDetails = document.getElementById('score-details');
+                scoreDetails.innerHTML = '';
+                 Object.entries(scores).forEach(([id, score]) => {
+                    const name = isSoloMode ? (id === 'player' ? 'You' : botPlayers.find(b=>b.id===id).name) : room.peers[id]?.username;
+                     if (name) {
+                        const row = document.createElement('div');
+                        row.className = 'score-row';
+                        row.innerHTML = `<span class="player-name">${name}</span><span class="player-score-value">${score}</span>`;
+                        scoreDetails.appendChild(row);
+                    }
+                });
+                document.getElementById('next-round-button').style.display = 'none';
+                document.getElementById('back-to-menu-button').style.display = 'block';
+                document.getElementById('back-to-menu-button').onclick = () => { overlay.style.display = 'none'; };
+                document.getElementById('back-to-menu-button').innerText = "Close";
+                overlay.style.display = 'flex';
+            }
+        }
+    }
+
+    // This is a placeholder for the generated logo.
+    // In a real scenario, this would be an actual image file.
+    (function createLogoDataURL() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 160;
+        const ctx = canvas.getContext('2d');
+
+        // Background
+        ctx.fillStyle = '#1c7c54'; // Green Felt
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // White oval
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(-20 * Math.PI / 180);
+        ctx.scale(1, 0.6);
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(0, 0, 110, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.restore();
+
+        // "CARDS" Text
+        ctx.font = 'italic bold 72px "Times New Roman", Times, serif';
+        ctx.fillStyle = 'black';
+        ctx.strokeStyle = '#c0c0c0'; // Silver outline
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.strokeText('CARDS', canvas.width / 2, canvas.height / 2 + 10);
+        ctx.fillText('CARDS', canvas.width / 2, canvas.height / 2 + 10);
+
+        const dataURL = canvas.toDataURL();
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .game-logo {
+                content: url(${dataURL});
+            }
+        `;
+        document.head.appendChild(style);
+    })();
+  </script>
+</body>
+</html>
